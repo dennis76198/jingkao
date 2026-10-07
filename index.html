@@ -1,0 +1,724 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<style>
+  :root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+  body{margin:0}
+  img{max-width:100%}
+  [hidden]{display:none!important}
+</style>
+</head>
+<body>
+<title>淨稿台</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Noto+Sans+TC:wght@400;500;700&display=swap">
+<style>
+/* 版面：左邊打字、右邊是存進雲端的那份檔案、下方一條淨稿檢查帶。重點色只用在被揭露的隱形字元。 */
+:root{
+  --paper:#F5F7F9;
+  --surface:#FFFFFF;
+  --ink:#14171D;
+  --ink-soft:#58606E;
+  --ink-faint:#8A93A2;
+  --rule:#DCE1E8;
+  --mark:#0D7A84;
+  --mark-wash:rgba(13,122,132,.10);
+  --clean:#9E5405;
+  --clean-wash:rgba(158,84,5,.10);
+  --font-ui:'Noto Sans TC',-apple-system,'PingFang TC','Microsoft JhengHei',sans-serif;
+  --font-mono:'JetBrains Mono','Noto Sans TC',ui-monospace,'SF Mono',Menlo,monospace;
+  color-scheme:light;
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){
+    --paper:#111419; --surface:#181C22; --ink:#E7EBF1; --ink-soft:#97A1B0; --ink-faint:#6B7584;
+    --rule:#282E38; --mark:#45C7D3; --mark-wash:rgba(69,199,211,.13);
+    --clean:#E2A45B; --clean-wash:rgba(226,164,91,.13);
+    color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --paper:#111419; --surface:#181C22; --ink:#E7EBF1; --ink-soft:#97A1B0; --ink-faint:#6B7584;
+  --rule:#282E38; --mark:#45C7D3; --mark-wash:rgba(69,199,211,.13);
+  --clean:#E2A45B; --clean-wash:rgba(226,164,91,.13);
+  color-scheme:dark;
+}
+
+*{box-sizing:border-box}
+html{box-sizing:border-box;height:100%}
+body{
+  height:100%;margin:0;
+  background:var(--paper);color:var(--ink);
+  font-family:var(--font-ui);font-size:15px;line-height:1.6;
+  display:flex;flex-direction:column;
+}
+button,input,select,textarea{font-family:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--mark);outline-offset:2px;border-radius:4px}
+
+.bar{
+  flex:0 0 auto;display:flex;align-items:baseline;gap:14px;flex-wrap:wrap;
+  padding:14px 20px;padding-top:calc(14px + env(safe-area-inset-top,0px));
+  border-bottom:1px solid var(--rule);background:var(--surface);
+}
+.wordmark{font-family:var(--font-mono);font-weight:700;font-size:1.05rem;letter-spacing:.02em;margin:0}
+.tagline{font-size:.78rem;color:var(--ink-soft);margin:0}
+.spacer{flex:1 1 auto;min-width:8px}
+.theme-btn{background:none;border:1px solid var(--rule);border-radius:999px;padding:4px 12px;font-size:.72rem;cursor:pointer;color:var(--ink-soft)}
+.theme-btn:hover{border-color:var(--mark);color:var(--mark)}
+
+.tools{
+  flex:0 0 auto;display:flex;gap:6px;flex-wrap:wrap;align-items:center;
+  padding:10px 20px;border-bottom:1px solid var(--rule);background:var(--surface);
+}
+.tool{background:transparent;border:1px solid var(--rule);border-radius:6px;padding:5px 10px;font-size:.78rem;cursor:pointer;white-space:nowrap}
+.tool:hover{border-color:var(--mark);color:var(--mark);background:var(--mark-wash)}
+.tool.primary{border-color:var(--mark);color:var(--mark);font-weight:500}
+.tool.primary:hover{background:var(--mark);color:var(--surface)}
+.tool-label{font-size:.7rem;color:var(--ink-faint);letter-spacing:.06em}
+
+.desk{flex:1 1 auto;min-height:0;display:grid;grid-template-columns:1fr 1fr;gap:1px;background:var(--rule)}
+.pane{background:var(--surface);display:flex;flex-direction:column;min-height:0;min-width:0}
+.pane-head{flex:0 0 auto;display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:9px 16px;border-bottom:1px solid var(--rule)}
+.pane-title{font-size:.72rem;letter-spacing:.1em;color:var(--ink-faint);text-transform:uppercase;font-weight:500;margin:0}
+.pane-note{font-size:.72rem;color:var(--ink-faint);margin:0;font-family:var(--font-mono)}
+
+#editor{
+  flex:1 1 auto;min-height:0;width:100%;border:0;resize:none;padding:18px 16px;
+  background:transparent;color:var(--ink);
+  font-family:var(--font-mono);font-size:14px;line-height:1.85;tab-size:2;
+}
+#editor:focus{outline:none}
+#editor::placeholder{color:var(--ink-faint)}
+
+#output{
+  flex:1 1 auto;min-height:0;overflow:auto;margin:0;padding:18px 16px;
+  font-family:var(--font-mono);font-size:14px;line-height:1.85;
+  white-space:pre-wrap;word-break:break-word;color:var(--ink);
+}
+.glyph{color:var(--mark);background:var(--mark-wash);border-radius:2px;font-size:.85em;padding:0 1px}
+.glyph.wide{letter-spacing:.3em;padding-right:4px}
+.nl{color:var(--mark);opacity:.4;font-size:.8em}
+
+.report{
+  flex:0 0 auto;border-top:1px solid var(--rule);background:var(--surface);
+  padding:10px 20px 12px;padding-bottom:calc(12px + env(safe-area-inset-bottom,0px));
+  max-height:32vh;overflow:auto;
+}
+.report-head{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;margin-bottom:8px}
+.report-title{font-size:.72rem;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-faint);margin:0;font-weight:500}
+.stat{font-family:var(--font-mono);font-size:.76rem;color:var(--ink-soft);font-variant-numeric:tabular-nums}
+.stat b{color:var(--ink);font-weight:500}
+.findings{display:flex;flex-wrap:wrap;gap:6px;list-style:none;margin:0;padding:0}
+.finding{display:flex;align-items:center;gap:7px;border:1px solid var(--rule);border-left:3px solid var(--clean);border-radius:5px;padding:5px 10px;background:var(--clean-wash)}
+.finding-n{font-family:var(--font-mono);font-weight:700;font-size:.8rem;color:var(--clean);font-variant-numeric:tabular-nums}
+.finding-l{font-size:.76rem}
+.finding-h{font-size:.7rem;color:var(--ink-soft);display:block;line-height:1.4}
+.allclear{font-size:.78rem;color:var(--ink-soft);margin:0}
+.allclear b{color:var(--mark);font-weight:500}
+
+.opts{display:flex;flex-wrap:wrap;gap:4px 14px;margin:10px 0 0;padding-top:9px;border-top:1px dashed var(--rule)}
+.opt{display:flex;align-items:center;gap:6px;font-size:.74rem;color:var(--ink-soft);cursor:pointer}
+.opt input{accent-color:var(--mark);margin:0;cursor:pointer}
+
+/* ---------- 輸出對話框 ---------- */
+#export-dlg{
+  border:1px solid var(--rule);border-radius:12px;padding:0;
+  background:var(--surface);color:var(--ink);
+  width:min(560px,calc(100vw - 32px));max-height:min(86vh,760px);
+  box-shadow:0 18px 50px rgba(0,0,0,.22);
+}
+#export-dlg::backdrop{background:rgba(10,13,18,.55)}
+.dlg-head{padding:18px 22px 12px;border-bottom:1px solid var(--rule)}
+.dlg-title{margin:0;font-size:1.05rem;font-weight:700}
+.dlg-sub{margin:4px 0 0;font-size:.78rem;color:var(--ink-soft)}
+.dlg-body{padding:16px 22px;display:flex;flex-direction:column;gap:14px;overflow:auto;max-height:46vh}
+.field{display:flex;flex-direction:column;gap:5px}
+.field > label{font-size:.76rem;font-weight:500}
+.field .req{color:var(--clean);font-size:.7rem;margin-left:4px}
+.field .why{font-size:.7rem;color:var(--ink-faint);line-height:1.45}
+.field input[type="text"],.field select{
+  border:1px solid var(--rule);border-radius:7px;background:transparent;
+  padding:8px 10px;font-size:.85rem;width:100%;
+}
+.field input:focus,.field select:focus{border-color:var(--mark);outline:none}
+.field input.bad{border-color:var(--clean);background:var(--clean-wash)}
+.err{font-size:.72rem;color:var(--clean);margin:0}
+.filename-box{
+  border:1px dashed var(--rule);border-radius:8px;padding:10px 12px;background:var(--paper);
+}
+.filename-box .k{font-size:.68rem;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-faint);display:block;margin-bottom:3px}
+#fname-preview{font-family:var(--font-mono);font-size:.85rem;font-weight:500;word-break:break-all}
+.dlg-foot{
+  padding:13px 22px;border-top:1px solid var(--rule);
+  display:flex;gap:8px;align-items:center;flex-wrap:wrap;
+  padding-bottom:calc(13px + env(safe-area-inset-bottom,0px));
+}
+.btn{border:1px solid var(--rule);border-radius:7px;padding:8px 14px;font-size:.82rem;cursor:pointer;background:transparent}
+.btn:hover{border-color:var(--mark);color:var(--mark)}
+.btn.go{background:var(--mark);border-color:var(--mark);color:#fff;font-weight:500}
+.btn.go:hover{filter:brightness(1.08);color:#fff}
+
+.tabs{display:none;gap:4px;padding:8px 20px 0}
+.tab{flex:1;background:transparent;border:1px solid var(--rule);border-bottom:0;border-radius:7px 7px 0 0;padding:7px;font-size:.78rem;cursor:pointer}
+.tab[aria-selected="true"]{background:var(--surface);color:var(--mark);font-weight:500}
+
+@media (max-width:860px){
+  body{height:auto;min-height:100%}
+  .tabs{display:flex}
+  .desk{grid-template-columns:1fr;background:transparent;gap:0;padding:0 20px}
+  .pane{border:1px solid var(--rule);border-radius:0 0 8px 8px;min-height:52vh}
+  .pane.hide{display:none}
+  .report{max-height:none}
+  .dlg-body{max-height:50vh}
+}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+</style>
+
+<header class="bar">
+  <h1 class="wordmark">淨稿台</h1>
+  <p class="tagline">貼進來就乾淨。看不見的字元留在門外。</p>
+  <span class="spacer"></span>
+  <button class="theme-btn" id="theme-btn" type="button">切換深色</button>
+</header>
+
+<div class="tools">
+  <span class="tool-label">段落</span>
+  <button class="tool" data-md="h2" type="button">大標</button>
+  <button class="tool" data-md="h3" type="button">小標</button>
+  <button class="tool" data-md="ul" type="button">條列</button>
+  <button class="tool" data-md="ol" type="button">編號</button>
+  <button class="tool" data-md="quote" type="button">引用</button>
+  <button class="tool" data-md="hr" type="button">分隔線</button>
+  <button class="tool" id="btn-tidy" type="button">重新淨稿</button>
+  <span class="spacer"></span>
+  <button class="tool primary" id="btn-export" type="button">輸出檔案…</button>
+  <button class="tool" id="btn-copy" type="button">複製</button>
+  <button class="tool" id="btn-clear" type="button">清空</button>
+</div>
+
+<div class="tabs" role="tablist">
+  <button class="tab" role="tab" id="tab-edit" aria-selected="true" type="button">編輯</button>
+  <button class="tab" role="tab" id="tab-out" aria-selected="false" type="button">存進雲端的原文</button>
+</div>
+
+<main class="desk">
+  <section class="pane" id="pane-edit">
+    <div class="pane-head">
+      <h2 class="pane-title">輸入稿</h2>
+      <p class="pane-note">貼上時自動淨稿</p>
+    </div>
+    <textarea id="editor" spellcheck="false" placeholder="從任何地方貼上文案 —— 備忘錄、Word、LINE、FB、Google 文件都行。"></textarea>
+  </section>
+
+  <section class="pane hide" id="pane-out">
+    <div class="pane-head">
+      <h2 class="pane-title">存進雲端的原文</h2>
+      <p class="pane-note">Markdown ・ UTF-8 無 BOM ・ LF</p>
+      <span class="spacer"></span>
+      <label class="opt"><input type="checkbox" id="opt-reveal" checked> 顯示隱形字元</label>
+    </div>
+    <pre id="output"></pre>
+  </section>
+</main>
+
+<section class="report" aria-live="polite">
+  <div class="report-head">
+    <h2 class="report-title">淨稿檢查</h2>
+    <span class="stat" id="stat">—</span>
+  </div>
+  <div id="findings-wrap"><p class="allclear">尚未貼上任何內容。</p></div>
+  <div class="opts">
+    <label class="opt"><input type="checkbox" id="opt-curly" checked> 彎引號轉直引號</label>
+    <label class="opt"><input type="checkbox" id="opt-trail" checked> 清除行尾空白</label>
+    <label class="opt"><input type="checkbox" id="opt-blank" checked> 連續空行壓成一行</label>
+    <label class="opt"><input type="checkbox" id="opt-full"> 全形空格轉半形</label>
+  </div>
+</section>
+
+<dialog id="export-dlg" aria-labelledby="dlg-title">
+  <div class="dlg-head">
+    <h2 class="dlg-title" id="dlg-title">輸出檔案</h2>
+    <p class="dlg-sub">這幾欄會寫進檔案開頭的檔頭。AI 讀檔時先看檔頭，就知道這份是什麼、什麼時候寫的，不必從內文猜。</p>
+  </div>
+
+  <div class="dlg-body">
+    <div class="field">
+      <label for="f-title">標題<span class="req">必填</span></label>
+      <input type="text" id="f-title" spellcheck="false" placeholder="例：世貿101興康華廈 電梯三房" autocomplete="off">
+      <span class="why">同時當檔名用。</span>
+      <p class="err" id="title-err" hidden>請先填標題，它要當檔名。</p>
+    </div>
+
+    <div class="field">
+      <label for="f-kind">類型</label>
+      <select id="f-kind">
+        <option>物件文案</option>
+        <option>社群貼文</option>
+        <option>廣告文案</option>
+        <option>客戶說明</option>
+        <option>會議紀錄</option>
+        <option>其他</option>
+      </select>
+      <span class="why">讓 AI 知道該用什麼口吻接手續寫或改寫。</span>
+    </div>
+
+    <div class="field">
+      <label for="f-tags">標籤</label>
+      <input type="text" id="f-tags" spellcheck="false" placeholder="信義區, 三房, 3098萬" autocomplete="off">
+      <span class="why">用逗號分隔。日後整個資料夾丟給 AI 時，靠這個篩。</span>
+    </div>
+
+    <div class="field">
+      <label for="f-summary">一句話摘要</label>
+      <input type="text" id="f-summary" spellcheck="false" placeholder="象山站步行 4 分鐘的電梯三房，開價 3098 萬" autocomplete="off">
+      <span class="why">AI 不必讀完全文就能判斷要不要用這份。</span>
+    </div>
+
+    <label class="opt"><input type="checkbox" id="f-dateprefix" checked> 檔名前面加日期（雲端硬碟才會照時間排序）</label>
+
+    <div class="filename-box">
+      <span class="k">存出來的檔名</span>
+      <span id="fname-preview">—</span>
+    </div>
+  </div>
+
+  <div class="dlg-foot">
+    <button class="btn go" id="dlg-md" type="button">存成 .md</button>
+    <button class="btn" id="dlg-txt" type="button">存成 .txt</button>
+    <span class="spacer"></span>
+    <button class="btn" id="dlg-cancel" type="button">取消</button>
+  </div>
+</dialog>
+
+<script>
+/* ============================================================
+   淨稿規則
+   硬規則：一定會讓格式跑掉的隱形字元，無條件清掉。
+   軟規則：風格取向，使用者自己決定。
+
+   ⚠️ 正規表示式一律用 cp() 組出來，不寫 \uXXXX 字面轉義 —— 這份檔案在
+      傳輸、複製、存檔的過程中，轉義有可能被還原成真字元（正是本工具要
+      解決的那個問題），那會讓整組規則當場失效。
+   ============================================================ */
+const cp = (hex) => String.fromCharCode(parseInt(hex, 16));
+const cls = (...parts) => new RegExp('[' + parts.join('') + ']', 'g');
+const range = (a, b) => cp(a) + '-' + cp(b);
+
+const HARD = [
+  { id:'zw', label:'零寬字元 / BOM',
+    hint:'完全看不見，卻會讓搜尋、比對、JSON 解析整個失準',
+    subs:[[cls(range('200B','200D'), cp('2060'), cp('FEFF')), '']] },
+  { id:'nbsp', label:'不換行空格 NBSP',
+    hint:'蘋果與 Word 最常偷塞的字元，長得像空格但不是空格',
+    subs:[[cls(cp('00A0'), cp('2007'), cp('202F')), ' ']] },
+  { id:'thin', label:'排版用細空格',
+    hint:'從網頁或 PDF 複製時夾帶的各種寬度空格',
+    subs:[[cls(range('2000','2006'), range('2008','200A'), cp('205F')), ' ']] },
+  { id:'lsep', label:'行分隔符 U+2028 / U+2029',
+    hint:'備忘錄與 Pages 的換行，很多系統讀不出來，整段會黏成一行',
+    subs:[[cls(cp('2028'), cp('2029')), '\n']] },
+  { id:'crlf', label:'Windows 換行 CRLF',
+    hint:'每行尾端多一個看不見的 CR，字串比對永遠對不上',
+    subs:[[/\r\n/g, '\n'], [/\r/g, '\n']] },
+  { id:'tab', label:'定位字元 Tab',
+    hint:'貼進欄位會變成喬不好的縮排，標題開頭特別常中招',
+    subs:[[/\t/g, ' ']] },
+  { id:'shy', label:'軟連字號',
+    hint:'隱形的斷字符號，複製到別處會突然冒出一個「-」',
+    subs:[[cls(cp('00AD')), '']] },
+  { id:'ctrl', label:'控制字元',
+    hint:'從 PDF 或郵件複製時夾帶的不可見控制碼',
+    subs:[[cls(range('0000','0008'), cp('000B'), cp('000C'), range('000E','001F'), cp('007F')), '']] }
+];
+
+const SOFT = {
+  curly:{ label:'彎引號', hint:'自動捲曲的引號，跨系統顯示不一致',
+          subs:[[cls(cp('2018'), cp('2019')), "'"], [cls(cp('201C'), cp('201D')), '"']] },
+  full: { label:'全形空格', hint:'中文排版的全形空白，轉半形後對齊才一致',
+          subs:[[cls(cp('3000')), ' ']] }
+};
+
+/* 純函式：回傳 { text, findings:[{label,hint,count}] } */
+function normalize(input, opts){
+  let text = String(input == null ? '' : input);
+  const findings = [];
+
+  const apply = (rule) => {
+    let n = 0;
+    for (const [re, to] of rule.subs){
+      const m = text.match(re);
+      if (m){ n += m.length; text = text.replace(re, to); }
+    }
+    if (n) findings.push({ label:rule.label, hint:rule.hint, count:n });
+  };
+
+  HARD.forEach(apply);
+  if (opts.curly) apply(SOFT.curly);
+  if (opts.full)  apply(SOFT.full);
+
+  if (opts.trail){
+    const before = text;
+    text = text.replace(/[ ]+$/gm, '');
+    const n = countLineDiff(before, text);
+    if (n) findings.push({ label:'行尾空白', hint:'肉眼看不出來，貼到表格或程式裡會多出空欄', count:n });
+  }
+  if (opts.blank){
+    const m = text.match(/\n{3,}/g);
+    if (m){
+      text = text.replace(/\n{3,}/g, '\n\n');
+      findings.push({ label:'連續空行', hint:'三行以上的空白壓成一行，段距才會一致', count:m.length });
+    }
+  }
+  return { text, findings };
+}
+
+function countLineDiff(a, b){
+  const la = a.split('\n'), lb = b.split('\n');
+  let n = 0;
+  for (let i = 0; i < la.length; i++) if (la[i] !== lb[i]) n++;
+  return n;
+}
+
+/* ============================================================
+   檔案長相：YAML 檔頭 + Markdown 正文
+   AI 先讀檔頭知道「這是什麼」，再讀正文拿到排版；人用任何裝置
+   打開都是同一份純文字。
+   ============================================================ */
+function today(){
+  const d = new Date();
+  return d.getFullYear() + '-' +
+    String(d.getMonth() + 1).padStart(2, '0') + '-' +
+    String(d.getDate()).padStart(2, '0');
+}
+
+/* YAML 一律用雙引號包起來，標題裡有冒號、井號也不會壞掉 */
+const q = (s) => '"' + String(s).replace(/\\/g, '\\\\').replace(/"/g, '\\"') + '"';
+
+function splitTags(raw){
+  return String(raw || '').split(/[,，、]/).map(s => s.trim()).filter(Boolean);
+}
+
+function buildFile(body, meta){
+  const text = body.replace(/\s+$/, '');
+  if (!meta || meta.off) return text + '\n';
+  const tags = splitTags(meta.tags);
+  const lines = ['---', '標題: ' + q(meta.title || '未命名')];
+  if (meta.kind)    lines.push('類型: ' + q(meta.kind));
+  if (tags.length)  lines.push('標籤: [' + tags.map(q).join(', ') + ']');
+  if (meta.summary) lines.push('摘要: ' + q(meta.summary));
+  lines.push('日期: ' + today());
+  lines.push('字數: ' + [...text.replace(/\s/g, '')].length);
+  lines.push('格式: ' + q('Markdown / UTF-8 / LF'));
+  lines.push('---', '');
+  return lines.join('\n') + '\n' + text + '\n';
+}
+
+/* 檔名：日期在前，雲端硬碟才會照時間排序 */
+function makeFilename(title, datePrefix, ext){
+  const safe = String(title || '未命名')
+    .replace(/[\\/:*?"<>|]/g, '')
+    .replace(/\s+/g, '-')
+    .slice(0, 60) || '未命名';
+  return (datePrefix ? today() + '_' : '') + safe + '.' + ext;
+}
+
+/* 從第一個標題猜標題，讓對話框一開就有東西 */
+function guessTitle(body){
+  const line = body.split('\n').find(l => /^#{1,6}\s+\S/.test(l)) ||
+               body.split('\n').find(l => l.trim()) || '';
+  return line.replace(/^#{1,6}\s*/, '').replace(/^[>\-*\d.\s]+/, '').trim().slice(0, 60);
+}
+
+/* ============================================================
+   介面
+   ============================================================ */
+const el = (id) => document.getElementById(id);
+const editor = el('editor');
+const output = el('output');
+const statEl = el('stat');
+const findingsWrap = el('findings-wrap');
+const dlg = el('export-dlg');
+
+const OPT_IDS = ['curly','trail','blank','full'];
+const readOpts = () => Object.fromEntries(OPT_IDS.map(k => [k, el('opt-' + k).checked]));
+
+/* 使用者在對話框填的檔頭資料 */
+let meta = { title:'', kind:'物件文案', tags:'', summary:'', datePrefix:true };
+try {
+  const saved = JSON.parse(localStorage.getItem('jingkao.meta') || 'null');
+  if (saved && typeof saved === 'object') meta = Object.assign(meta, saved);
+} catch (e) { /* 無痕視窗會擋，用預設值 */ }
+
+const saveMeta = () => {
+  try { localStorage.setItem('jingkao.meta', JSON.stringify(meta)); } catch (e) {}
+};
+
+/* 預覽面板用的 meta：標題還沒填就先用猜的，不讓右欄開天窗 */
+const previewMeta = () => Object.assign({}, meta, { title: meta.title || guessTitle(editor.value) });
+
+const SAMPLE = [
+  '# 世貿101興康華廈 電梯三房',
+  '',
+  '開價 3098 萬 ｜ 權狀 42.6 坪 ｜ 屋齡 18 年',
+  '',
+  '## 物件亮點',
+  '',
+  '- 正三房雙衛，客廳面寬 5 米，整層採光無遮蔽',
+  '- 走路 4 分鐘到象山站，台北 101 商圈生活圈',
+  '- 社區 24 小時管理，公設比 31%，平面車位可另議',
+  '',
+  '## 適合誰',
+  '',
+  '首購升級的雙薪家庭，或想在信義區置產收租的投資客。',
+  '',
+  '> 屋主已另置產，誠意出售，可配合交屋時間。',
+  '',
+  '---',
+  '',
+  '聯絡：狀元' + cp('3000') + '0912-345-678'
+].join('\n');
+
+const ESC = { '&':'&amp;', '<':'&lt;', '>':'&gt;' };
+const esc = (s) => s.replace(/[&<>]/g, c => ESC[c]);
+const IDEO = cp('3000');
+
+function render(text, reveal){
+  if (!text){
+    output.innerHTML = '<span style="color:var(--ink-faint)">左邊打字或貼上，這裡會同步顯示存進雲端的那份檔案，一個字元都不差。</span>';
+    return;
+  }
+  const file = buildFile(text, previewMeta());
+  if (!reveal){ output.textContent = file; return; }
+  output.innerHTML = file.split('\n').map(line =>
+    esc(line)
+      .split(IDEO).join('<span class="glyph wide">□</span>')
+      .replace(/ /g, '<span class="glyph">·</span>')
+  ).join('<span class="nl">¶</span>\n');
+}
+
+function renderReport(findings, text){
+  const chars = [...text].length;
+  const noSpace = [...text.replace(/\s/g, '')].length;
+  const lines = text ? text.split('\n').length : 0;
+  statEl.innerHTML = '<b>' + chars + '</b> 字元（不含空白 <b>' + noSpace + '</b>）・<b>' + lines + '</b> 行';
+
+  if (!text){ findingsWrap.innerHTML = '<p class="allclear">尚未貼上任何內容。</p>'; return; }
+  if (!findings.length){
+    findingsWrap.innerHTML = '<p class="allclear"><b>乾淨</b> —— 沒有任何會讓格式跑掉的字元，可以直接存進雲端硬碟交給 AI。</p>';
+    return;
+  }
+  findingsWrap.innerHTML = '<ul class="findings">' + findings.map(f =>
+    '<li class="finding"><span class="finding-n">' + f.count + '</span>' +
+    '<span class="finding-l">' + esc(f.label) + '<span class="finding-h">' + esc(f.hint) + '</span></span></li>'
+  ).join('') + '</ul>';
+}
+
+let lastFindings = [];
+function refresh(findings){
+  if (findings) lastFindings = findings;
+  const text = editor.value;
+  render(text, el('opt-reveal').checked);
+  renderReport(lastFindings, text);
+  try { localStorage.setItem('jingkao.draft', text); } catch (e) {}
+}
+
+/* ---- 貼上即淨稿 ---- */
+editor.addEventListener('paste', (e) => {
+  const cb = e.clipboardData || window.clipboardData;
+  if (!cb) return;
+  e.preventDefault();
+  const { text, findings } = normalize(cb.getData('text/plain'), readOpts());
+  insertAtCursor(text);
+  refresh(findings);
+});
+
+function insertAtCursor(text){
+  editor.focus();
+  let ok = false;
+  try { ok = document.execCommand('insertText', false, text); } catch (e) { ok = false; }
+  if (!ok){
+    const s = editor.selectionStart, t = editor.selectionEnd;
+    editor.setRangeText(text, s, t, 'end');
+  }
+}
+
+el('btn-tidy').addEventListener('click', () => {
+  const { text, findings } = normalize(editor.value, readOpts());
+  editor.value = text;
+  refresh(findings);
+});
+
+/* ---- Markdown 段落工具 ---- */
+const WRAP = {
+  h2:   (l) => '## ' + l.replace(/^#{1,6}\s*/, ''),
+  h3:   (l) => '### ' + l.replace(/^#{1,6}\s*/, ''),
+  ul:   (l) => '- ' + l.replace(/^[-*]\s*/, ''),
+  ol:   (l, i) => (i + 1) + '. ' + l.replace(/^\d+\.\s*/, ''),
+  quote:(l) => '> ' + l.replace(/^>\s*/, '')
+};
+
+document.querySelectorAll('[data-md]').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const kind = btn.dataset.md;
+    if (kind === 'hr'){ insertAtCursor('\n\n---\n\n'); refresh(); return; }
+    const v = editor.value;
+    const s = v.lastIndexOf('\n', Math.max(0, editor.selectionStart - 1)) + 1;
+    let e2 = v.indexOf('\n', editor.selectionEnd);
+    if (e2 === -1) e2 = v.length;
+    const out = v.slice(s, e2).split('\n').map((l, i) => l.trim() ? WRAP[kind](l, i) : l).join('\n');
+    editor.focus();
+    editor.setSelectionRange(s, e2);
+    let ok = false;
+    try { ok = document.execCommand('insertText', false, out); } catch (err) { ok = false; }
+    if (!ok) editor.setRangeText(out, s, e2, 'end');
+    refresh();
+  });
+});
+
+/* ============================================================
+   輸出對話框
+   ============================================================ */
+/* 單機版直接用 <a download>：瀏覽器自己存檔，沒有任何確認框。
+   （Chrome 若開了「下載前詢問儲存位置」才會問，那是瀏覽器設定，不是這頁。） */
+function saveFile(filename, text){
+  const blob = new Blob([text], { type:'text/plain;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = filename;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+const F = { title:el('f-title'), kind:el('f-kind'), tags:el('f-tags'),
+            summary:el('f-summary'), datePrefix:el('f-dateprefix') };
+
+function readForm(){
+  meta = {
+    title: F.title.value.trim(),
+    kind: F.kind.value,
+    tags: F.tags.value,
+    summary: F.summary.value.trim(),
+    datePrefix: F.datePrefix.checked
+  };
+  return meta;
+}
+
+function syncFilenamePreview(){
+  const t = F.title.value.trim();
+  el('fname-preview').textContent = t
+    ? makeFilename(t, F.datePrefix.checked, 'md')
+    : '填了標題才會有檔名';
+}
+
+Object.values(F).forEach(input => {
+  input.addEventListener('input', () => {
+    F.title.classList.remove('bad');
+    el('title-err').hidden = true;
+    syncFilenamePreview();
+    readForm(); saveMeta(); refresh();
+  });
+  input.addEventListener('change', syncFilenamePreview);
+});
+
+el('btn-export').addEventListener('click', () => {
+  F.title.value = meta.title || guessTitle(editor.value);
+  F.kind.value = meta.kind || '物件文案';
+  F.tags.value = meta.tags || '';
+  F.summary.value = meta.summary || '';
+  F.datePrefix.checked = meta.datePrefix !== false;
+  F.title.classList.remove('bad');
+  el('title-err').hidden = true;
+  syncFilenamePreview();
+  dlg.showModal();
+  F.title.focus();
+  F.title.select();
+});
+
+el('dlg-cancel').addEventListener('click', () => dlg.close());
+
+function doSave(ext){
+  const m = readForm();
+  if (!m.title){
+    F.title.classList.add('bad');
+    el('title-err').hidden = false;
+    F.title.focus();
+    return;
+  }
+  saveMeta(); refresh();
+
+  // 字串交給 Blob 就是 UTF-8 無 BOM，換行已在淨稿階段統一成 LF
+  saveFile(makeFilename(m.title, m.datePrefix, ext), buildFile(editor.value, m));
+  dlg.close();
+}
+el('dlg-md').addEventListener('click', () => doSave('md'));
+el('dlg-txt').addEventListener('click', () => doSave('txt'));
+
+el('btn-copy').addEventListener('click', async () => {
+  const btn = el('btn-copy');
+  try {
+    await navigator.clipboard.writeText(buildFile(editor.value, previewMeta()));
+    flash(btn, '已複製');
+  } catch (e) {
+    editor.select();
+    flash(btn, '請按複製鍵');
+  }
+});
+
+el('btn-clear').addEventListener('click', () => {
+  editor.value = '';
+  lastFindings = [];
+  refresh([]);
+  editor.focus();
+});
+
+function flash(btn, msg){
+  const old = btn.textContent;
+  btn.textContent = msg;
+  setTimeout(() => { btn.textContent = old; }, 1600);
+}
+
+/* ---- 選項 / 主題 / 分頁 ---- */
+OPT_IDS.concat(['reveal']).forEach(k => el('opt-' + k).addEventListener('change', () => refresh()));
+editor.addEventListener('input', () => refresh());
+
+el('theme-btn').addEventListener('click', () => {
+  const root = document.documentElement;
+  const dark = root.getAttribute('data-theme') === 'dark'
+    || (!root.getAttribute('data-theme') && matchMedia('(prefers-color-scheme: dark)').matches);
+  root.setAttribute('data-theme', dark ? 'light' : 'dark');
+  el('theme-btn').textContent = dark ? '切換深色' : '切換淺色';
+});
+
+const tabEdit = el('tab-edit'), tabOut = el('tab-out');
+function showPane(which){
+  const isEdit = which === 'edit';
+  el('pane-edit').classList.toggle('hide', !isEdit);
+  el('pane-out').classList.toggle('hide', isEdit);
+  tabEdit.setAttribute('aria-selected', String(isEdit));
+  tabOut.setAttribute('aria-selected', String(!isEdit));
+}
+tabEdit.addEventListener('click', () => showPane('edit'));
+tabOut.addEventListener('click', () => showPane('out'));
+
+const mq = matchMedia('(max-width: 860px)');
+function syncPanes(){
+  if (mq.matches) showPane(tabOut.getAttribute('aria-selected') === 'true' ? 'out' : 'edit');
+  else { el('pane-edit').classList.remove('hide'); el('pane-out').classList.remove('hide'); }
+}
+mq.addEventListener('change', syncPanes);
+
+/* ---- 開場 ---- */
+let draft = '';
+try { draft = localStorage.getItem('jingkao.draft') || ''; } catch (e) { draft = ''; }
+editor.value = draft || SAMPLE;
+const first = normalize(editor.value, readOpts());
+editor.value = first.text;
+lastFindings = first.findings;
+syncPanes();
+syncFilenamePreview();
+refresh(first.findings);
+</script>
+
+</body>
+</html>
